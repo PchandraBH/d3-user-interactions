@@ -1,3 +1,10 @@
 #my_dataviz {
   margin-left: 100px;
+  margin-top: 100px;
+}
+
+.selected {
+  opacity: 1 !important;
+  stroke: black;
+  stroke-width: 1px;
 }

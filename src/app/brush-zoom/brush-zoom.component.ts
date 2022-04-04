@@ -21,64 +21,65 @@ export class BrushZoomComponent implements OnInit {
   private area: any;
   private areaGenerator: any;
   private svg: any;
-  private Xval: any;
-  public name = 'chandra';
   public g: any;
+  private unzoom: any;
+  private clip: any;
+  private focus: any;
+  private width: any;
+  private height: any;
 
   ngOnInit(): void {
-    const margin = { top: 10, right: 30, bottom: 30, left: 60 },
-      width = 900 - margin.left - margin.right,
-      height = 500 - margin.top - margin.bottom;
+    const margin = { top: 10, right: 30, bottom: 30, left: 60 };
+    (this.width = 900 - margin.left - margin.right),
+      (this.height = 500 - margin.top - margin.bottom);
 
     this.svg = d3
       .select('#my_dataviz')
       .append('svg')
-      .attr('width', width + margin.left + margin.right)
-      .attr('height', height + margin.top + margin.bottom)
+      .attr('width', this.width + margin.left + margin.right)
+      .attr('height', this.height + margin.top + margin.bottom)
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    this.x = d3Scale.scaleTime().range([0, width]);
+    this.x = d3Scale.scaleTime().range([0, this.width]);
     this.x.domain(d3Array.extent(STOCKS, (d) => d.date));
 
     this.xAxis = this.svg
       .append('g')
-      .attr('transform', `translate(0,${height})`)
+      .attr('transform', `translate(0,${this.height})`)
       .call(d3.axisBottom(this.x));
 
-    this.y = d3Scale.scaleLinear().range([height, 0]);
+    this.y = d3Scale.scaleLinear().range([this.height, 0]);
     this.y.domain(d3Array.extent(STOCKS, (d) => d.value));
 
-    console.log('y values', this.y, 'end');
     this.yAxis = this.svg
       .append('g')
       .attr('class', 'axis axis--y')
       .call(d3.axisLeft(this.y));
 
-    const clip = this.svg
+    this.clip = this.svg
       .append('defs')
-      .append('clipPath')
+      .append('svg:clipPath')
       .attr('id', 'clip')
-      .append('rect')
-      .attr('width', width)
-      .attr('height', height)
+      .append('svg:rect')
+      .attr('width', this.width)
+      .attr('height', this.height)
       .attr('x', 0)
-      .attr('y', 0);
-
-    // Add brushing
-    // this.brush = d3
-    //   .brushX() // Add the brush feature using the d3.brush function
-    //   .extent([
-    //     [0, 0],
-    //     [width, height],
-    //   ])
-    //   .on('end', () => this.updateChart); // Each time the brush selection changes, trigger the 'updateChart' function
+      .attr('y', 0)
+      .attr('cursor', 'pointer');
 
     this.brush = this.svg
       .append('g')
       .attr('class', 'brush')
-      .call(d3.brushX().on('end', this.updateChart.bind(this)));
-    console.log('After brush', this.x);
+      .call(
+        d3
+          .brush()
+          .extent([
+            [0, 0],
+            [300, 400],
+          ])
+          .on('start end', this.updateChart.bind(this))
+      );
 
     // Create the area variable: where both the area and the brush take place
     this.area = this.svg.append('g').attr('clip-path', 'url(#clip)');
@@ -103,40 +104,44 @@ export class BrushZoomComponent implements OnInit {
 
     // Add the brushing
     // this.area.append('g').attr('class', 'brush').call(this.brush);
+
+    this.area
+      .append('g')
+      .attr('class', 'brush')
+      .call(d3.brushX().on('end', this.updateChart.bind(this)));
   }
 
   public updateChart(event: any): any {
     const extent = event.selection;
-    console.log('Update chart', event);
-    console.log('this.x', this.x);
-    console.log('name', this.name);
-    console.log('extent value', extent);
     // If no selection, back to initial coordinate. Otherwise, update X axis domain
     if (!extent) {
       if (!this.idleTimeout)
-        return (this.idleTimeout = setTimeout(this.idled, 350)); // This allows to wait a little bit
+        return (this.idleTimeout = setTimeout(this.idled, 200)); // This allows to wait a little bit
       this.x.domain([4, 8]);
     } else {
-      console.log('extent value', extent);
-      console.log('x values', this.x);
-      console.log('extent', this.x.invert(171));
-      console.log('extent', this.x.invert(extent[0]));
-
       this.x.domain([this.x.invert(extent[0]), this.x.invert(extent[1])]);
-      // this.area.select('.brush').call(this.brush.move, null); // This remove the grey brush area as soon as the selection has been done
+      this.y.domain([this.y.invert(extent[1]), this.y.invert(extent[0])]);
+
+      this.area.select('.brush').call(d3.brush().move, null); // This remove the grey brush area as soon as the selection has been done
     }
-    this.xAxis.transition().duration(1000).call(d3.axisBottom(this.x));
+    this.xAxis.transition().duration(500).call(d3.axisBottom(this.x));
+    this.yAxis.transition().duration(500).call(d3.axisLeft(this.y));
+
     this.area
       .select('.myArea')
       .transition()
-      .duration(1000)
+      .duration(500)
       .attr('d', this.areaGenerator);
 
-    // this.svg('dblclick', () => {
-    //   this.x.domain(d3.extent(this.data, (d) => d.date));
-    //   this.xAxis.transition().call(d3.axisBottom(this.x));
-    //   this.area.select('.myArea').transition().attr('d', this.areaGenerator);
-    // });
+    this.unzoom = this.svg.on('dblclick', () => {
+      this.x.domain(d3.extent(this.data, (d) => d.date));
+      this.y.domain(d3.extent(this.data, (d) => d.value));
+
+      this.xAxis.transition().call(d3.axisBottom(this.x));
+      this.yAxis.transition().call(d3.axisLeft(this.y));
+
+      this.area.select('.myArea').transition().attr('d', this.areaGenerator);
+    });
   }
 
   private idled() {
